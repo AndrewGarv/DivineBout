@@ -1,54 +1,54 @@
 /********************************************//**
  *  Player
- * One of the most important classes there is. This is the player character. It dictates most everything about them from how they are rendered to their animations to their movement options.
- * It is referenced a lot in Source.cpp however only one Player object will ever exist at one point.
+ * The player character. It dictates most everything about them: their sprite, their animations and their movement options.
+ * Only one Player object exists at a time.
+ *
+ * Each frame the main loop calls inputRead for every event, then update once, then render once. Nothing in here
+ * blocks or presents the frame, so the player can share the screen with enemies.
  ***********************************************/
 #pragma once
-#include <string>
-#include <vector>
 #include <SDL.h>
-#include <SDL_image.h>
-#include <stdio.h>
 #include "GameFlow.h"
 #include "Textures.h"
-#include "Sprites.h"
+
 class Player
 {
 public:
-	int frame = 0;
-	int posX, posY;
-	static const int MaxVel = 15;
-	static const int MaxJmp = 370;//Always make sure this is smaller than PosY. Generally speaking try to make this 130 less than PosY
-	static const int PlrW = 0;
-	static const int PlrH = 0;//These two need to be adjusted. They are the sprites width and height
-	const Uint8* StateKeys = SDL_GetKeyboardState(NULL);
-	SDL_Rect StandingSprite[7];//The sprites used when the player character is standing in a neutral position
-	SDL_Rect RisingSprite[4];//The sprites used when the player character is in the rising portion of a jump
-	SDL_Rect MovingSprite[8];//The sprites used when the player character is moving
-	SDL_Rect AttackingSprite[4];//The sprites used when the player attacks
-	SDL_RendererFlip type;
-	Player();
-	void inputRead(SDL_Event& e, const GameFlow& OBJ);
-	void movement(const GameFlow& OBJ, SDL_Event& e);
-	void left(const GameFlow& OBJ);
-	void right(const GameFlow& OBJ);
-	void rise(const GameFlow& OBJ, SDL_Event& e);
-	void fall(const GameFlow& OBJ);
-	void idle(const GameFlow& OBJ);
-	std::vector<SDL_Rect> attack(const GameFlow& OBJ, SDL_Event& e);
-	void testFunc();
-	void render(const GameFlow& OBJ);
-	//The attack method will call this when the hitbox appears. Pass to it the attack hitbox and the enemy hurtbox. THINK ABOUT HOW TO DO THIS!
+	explicit Player(const GameFlow& OBJ);
+	void inputRead(const SDL_Event& e);
+	void update();
+	void render(const GameFlow& OBJ) const;
+
+	//Fills in the attack hitbox and returns true while an attack is out and has not hit anything yet
+	bool attackHitbox(SDL_Rect& box) const;
+	//Tell the player their current attack connected, so one swing can only hit once
+	void attackLanded() { hitLanded = true; }
+
+	int centreX() const { return posX + SpriteW / 2; }
+
+private:
+	static const int SpriteW = 43;//Every cut on the Brynild sprite sheet is this size
+	static const int SpriteH = 69;
+	static const int MaxVel = 15;//Top running speed in pixels per frame
+	static const int AirSpeed = 3;//Sideways speed while jumping
+	static const int JumpSpeed = 16;//Upwards speed at the start of a jump. With Gravity this gives a jump of about 130 pixels
+	static const int Gravity = 1;
+	static const int AnimDelay = 4;//Game frames each idle/moving sprite stays on screen
+	static const int AttackAnimDelay = 6;//Game frames each attack startup sprite stays on screen
+	static const int StartupFrames = 18;//Attack wind up, before the hitbox comes out
+	static const int ActiveFrames = 8;//How long the hitbox stays out
+	static const int AttackReach = 20;//How far in front of the sprite the attack hitbox reaches
+
+	enum State { Neutral, Moving, Rising, Falling, Startup, Active };
+	void setState(State next);
+	bool onGround() const { return current == Neutral || current == Moving; }
+
 	Textures Brnyld;
-	Sprites Plyr;
-	//About the Hitbox stuff. Consider this. These methods will be for the specific reactions to hitbox collision. The actual collisionCheck will be placed somewhere else. GIVE IT ITS OWN OBJECT
-private: 
-	int spdX, spdY;
-	enum State {Rising, Falling, Moving, Neutral, Hit, Active, Startup};
-	bool jmpflag = false;
-	std::vector<SDL_Rect> AtkHitbox;//Assertion failure??? RESIZE THE VECTOR BEFORE INITIALIZING IT!!!
-	State current;
+	State current = Neutral;
+	int frame = 0;//Frames spent in the current state. Drives the animations and the attack timing
+	int posX = 5;
+	int posY = GameFlow::GroundY - SpriteH;//Top left corner of the sprite
+	int spdX = 0, spdY = 0;
+	bool facingLeft = false;
+	bool hitLanded = false;
 };
-//Here is the plan. Make the collisionCheck in the Source. It will be called whenever attack runs. Attack will return a Rect. In the main loop, anytime an enemy appears on screen, their hurtbox
-//will be placed in an array. collisionCheck will run through the array and check if the attack is colliding with any of them. If it is, then it will send some sort of flag that will be interpreted
-//by the individual objects to get specific reactions.

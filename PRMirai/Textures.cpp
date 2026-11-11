@@ -1,114 +1,94 @@
 #include "Textures.h"
-#include "WindRend.h"
-#include <string>
+#include <SDL_image.h>
+#include <stdio.h>
+
 /********************************************//**
- *  Textures::Textures()
- * A self explanatory constructor. It sets the height and width to 0. Since a texture requires a rendered that will be created
- * elsewhere, this constructor will just set the texture to NULL
+ *  Textures::loadTex(const std::string& filename, const GameFlow& OBJ)
+ * Loads an image file straight into a texture using the renderer owned by the GameFlow object, replacing whatever
+ * texture was held before. Transparency comes from the alpha channel of the image itself.
+ * This does not do any cutting, it just loads the whole sprite sheet. Loading reads from disk, so call it once
+ * when a character is created, never every frame.
  ***********************************************/
-Textures::Textures()
+bool Textures::loadTex(const std::string& filename, const GameFlow& OBJ)
 {
-	TextureHeight = 0;
-	TextureWidth = 0;
-	HardwareTexture = NULL;//We need a bit more to actually create a texture so the constructor will just set it to null
-}
-/********************************************//**
- *  Textures::loadTex(std::string filename, const GameFlow &OBJ)
- * This function essentially creates the texture. It takes in a filename and a GameFlow object. 
- * This function obtains the filename for the image we will be using and then uses IM_Load to place that image onto a surface. Once the surface 
- * has been made we define what colour will be transparent with SetColorKey. In this case it will be the colour white. With all that done, we can finally create the 
- * texture with CreateTextureFromSruface. We'll be using the renderer defined by the GameFlow object. 
- * Once the texture has been made we set the texture variables TextureHeight and TextureWidth to match the size of the texture. 
- * This is technically an optional step as we can always figure out the dimensions simply through "Texture->w" and so forth but it is good to keep 
- * them in a somewhat permanent place. 
- * With the texture made, HardwareTexture is set to the temporary texture we have been using thus far and any useless variables are deleted
- ***********************************************/
-bool Textures::loadTex(std::string filename, const GameFlow &OBJ) 
-{
-	SDL_Texture* finalTexture = NULL;
-	SDL_Surface* finalSruface = IMG_Load(filename.c_str());
-	if (finalSruface == NULL)
+	killTexture();
+
+	HardwareTexture = IMG_LoadTexture(OBJ.mainRender, filename.c_str());
+	if (HardwareTexture == nullptr)
 	{
-		printf("Error 1");//Fill this in with an actual error message
-	}
-	else
-	{
-		SDL_SetColorKey(finalSruface, SDL_TRUE, SDL_MapRGB(finalSruface->format, 0, 0xFF, 0xFF));
-		finalTexture = SDL_CreateTextureFromSurface(OBJ.mainRender, finalSruface);
-		if (finalTexture == NULL)
-		{
-			printf("Error 2");//Fill this with an actual error message
-		}
-		else
-		{
-			TextureHeight = finalSruface->h;
-			TextureWidth = finalSruface->w;
-		}
-		HardwareTexture = finalTexture;
-		SDL_FreeSurface(finalSruface);
-		return HardwareTexture != NULL;//Remember that this function doesn't do the actual cutting. Basically it just loads a sprite sheet
+		printf("Could not load texture %s: %s\n", filename.c_str(), IMG_GetError());
+		return false;
 	}
 
+	SDL_QueryTexture(HardwareTexture, nullptr, nullptr, &TextureWidth, &TextureHeight);
+	return true;
 }
+
 /********************************************//**
  *  Textures::Colourset
- * A simple method that just alters the colour of the texture. Will probably see little to no use in this project.
+ * A simple method that just alters the colour of the texture.
  ***********************************************/
-
 void Textures::Colourset(Uint8 r, Uint8 g, Uint8 b)
 {
 	SDL_SetTextureColorMod(HardwareTexture, r, g, b);
 }
+
 /********************************************//**
  *  Textures::BlenderSet
- * A simple method that just turns on Alpha blending
+ * A simple method that sets how the texture is blended with what is already on screen
  ***********************************************/
 void Textures::BlenderSet(SDL_BlendMode blend)
 {
 	SDL_SetTextureBlendMode(HardwareTexture, blend);
 }
+
 /********************************************//**
  *  Textures::AlphaSet
- * A simple method that turns on the alpha, allowing for transparent like textures
+ * A simple method that sets the alpha of the whole texture, allowing for see-through textures
  ***********************************************/
-void Textures::AlphaSet(Uint8 alphatype)
+void Textures::AlphaSet(Uint8 alphaType)
 {
-	SDL_SetTextureAlphaMod(HardwareTexture, alphatype);
+	SDL_SetTextureAlphaMod(HardwareTexture, alphaType);
 }
+
 /********************************************//**
- *  Textures::render(const GameFlow& OBJ, int x, int y, SDL_Rect* cut, double angle, SDL_Point* centre, SDL_RendererFlip flipType)
- * A very important method. This renders whatever texture has been given to it onto the screen. There are several optional values that will alter the angle and orientation of the 
- * texture. cut is technically optional however since I am uploading entire sprite sheets, it is mandatory to only use the cuts that are needed.
+ *  Textures::render
+ * Draws the texture with its top left corner at (x, y). cut selects the part of the sprite sheet to draw, without it
+ * the whole texture is drawn. The remaining optional values alter the angle and orientation.
+ * This only draws into the current frame. Clearing and presenting the frame is the job of the main loop.
  ***********************************************/
-void Textures::render(const GameFlow& OBJ, int x, int y, SDL_Rect* cut, double angle, SDL_Point* centre, SDL_RendererFlip flipType)
+void Textures::render(const GameFlow& OBJ, int x, int y, const SDL_Rect* cut, double angle, const SDL_Point* centre, SDL_RendererFlip flipType) const
 {
+	if (HardwareTexture == nullptr)
+	{
+		return;
+	}
+
 	SDL_Rect RenderSpace = { x, y, TextureWidth, TextureHeight };
-	if (cut != NULL)//This function may take in a Srptie object and use something like Brynild as the cut instead of the cut I have up here now
+	if (cut != nullptr)
 	{
 		RenderSpace.w = cut->w;
 		RenderSpace.h = cut->h;
 	}
 	SDL_RenderCopyEx(OBJ.mainRender, HardwareTexture, cut, &RenderSpace, angle, centre, flipType);
 }
+
 /********************************************//**
  *  Textures::killTexture()
- * Not quite a destructor method but acts like one. This deallocates the texture when it is no longer in use. For enemies this would trigger whenever their HP runs out
+ * Deallocates the texture when it is no longer in use. For enemies this triggers when their HP runs out.
  * It also resets the height and width to 0
  ***********************************************/
 void Textures::killTexture()
 {
-	if (HardwareTexture != NULL)
+	if (HardwareTexture != nullptr)
 	{
 		SDL_DestroyTexture(HardwareTexture);
-		HardwareTexture = NULL;
+		HardwareTexture = nullptr;
 		TextureHeight = 0;
 		TextureWidth = 0;
 	}
 }
-/********************************************//**
- *  Textures::~Textures()
- * Destructor method
- ***********************************************/
+
 Textures::~Textures()
 {
 	killTexture();
