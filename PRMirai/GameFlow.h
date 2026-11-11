@@ -1,26 +1,25 @@
 /********************************************//**
- *  GmaeFlow
- * This class is responsible for creating and maintaining the SDL window that the game runs in. For the most pare there will only ever be one GameFlow object made at once.
+ *  GameFlow
+ * This class is responsible for creating and maintaining the SDL window and renderer that the game runs in.
+ * Only one GameFlow object should exist at a time, so it cannot be copied.
  ***********************************************/
 #pragma once
-#ifndef GAMEFLOW_H
-#define GAMEFLOW_H
-#include <string>
 #include <SDL.h>
-#include <SDL_image.h>
-#include <stdio.h>
-class Textures;
 
 class GameFlow
 {
 public:
-	GameFlow();
+	static const int ScreenW = 1920;//The screens width and height is set for 1080p
+	static const int ScreenH = 1080;
+	static const int GroundY = 569;//The line that every characters feet rest on
+
+	GameFlow() = default;
 	~GameFlow();
+	GameFlow(const GameFlow&) = delete;
+	GameFlow& operator=(const GameFlow&) = delete;
+
 	bool init();
-	SDL_Renderer* mainRender;
-	SDL_Window* mainWindow;
-	Textures* PlayerImage;
-	int ScreenW = 1920;//The screens width and height is set for 1080p
-	int ScreenH = 1080;
+
+	SDL_Window* mainWindow = nullptr;
+	SDL_Renderer* mainRender = nullptr;
 };
-#endif

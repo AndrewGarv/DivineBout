@@ -1,39 +1,33 @@
 /********************************************//**
  *  Textures
- * This class is responsible for managing each texture within the program. It contains the "render" method which is one of the most used methods in the entire program.
- * Every image in the game will have a corresponding texture object made for it.
+ * This class is responsible for managing a single texture (usually a whole sprite sheet). It contains the "render" method
+ * which is one of the most used methods in the entire program. Every image in the game has a corresponding Textures object.
+ * A Textures object owns its SDL_Texture, so it cannot be copied.
  ***********************************************/
 #pragma once
-#ifndef TEXTURES_H
-#define TEXTURES_H
 #include <string>
 #include <SDL.h>
-#include <SDL_image.h>
-#include <stdio.h>
 #include "GameFlow.h"
+
 class Textures
 {
 public:
-	Textures();//Constructor 
-	bool loadTex(std::string filename, const GameFlow& OBJ) ;
+	Textures() = default;
+	~Textures();
+	Textures(const Textures&) = delete;
+	Textures& operator=(const Textures&) = delete;
+
+	bool loadTex(const std::string& filename, const GameFlow& OBJ);
 	void Colourset(Uint8 r, Uint8 g, Uint8 b);
 	void BlenderSet(SDL_BlendMode blend);
 	void AlphaSet(Uint8 alphaType);
-	void render(const GameFlow& OBJ, int x, int y, SDL_Rect* cut = NULL, double angle = 0.0, SDL_Point* centre = NULL, SDL_RendererFlip flipType = SDL_FLIP_NONE);
+	void render(const GameFlow& OBJ, int x, int y, const SDL_Rect* cut = nullptr, double angle = 0.0, const SDL_Point* centre = nullptr, SDL_RendererFlip flipType = SDL_FLIP_NONE) const;
 	void killTexture();
-	~Textures();//Destructor
+	int getWidth() const { return TextureWidth; }
+	int getHeight() const { return TextureHeight; }
 
 private:
-	int TextureWidth;//Width of the texture
-	int TextureHeight;//Height of the texture
-	SDL_Texture* HardwareTexture;
+	int TextureWidth = 0;
+	int TextureHeight = 0;
+	SDL_Texture* HardwareTexture = nullptr;
 };
-
-
-#endif
-
-
-
-
-
-//The render function will be used a lot. Every character will make use of it. Remember that every character will also be using this class

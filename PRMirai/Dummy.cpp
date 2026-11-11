@@ -1,103 +1,113 @@
 #include "Dummy.h"
-#include <string>
-#include <SDL.h>
-#include <SDL_image.h>
-#include <stdio.h>
-#include <iostream>
+
+namespace
+{
+	//Where each pose sits on the DummyEnemy.png sprite sheet
+	const SDL_Rect StandingSprite = { 1, 1, 111, 131 };
+	const SDL_Rect AttackSprite = { 114, 1, 103, 143 };
+	const SDL_Rect MovingSprite = { 1, 146, 101, 152 };
+}
 
 Dummy::Dummy(const GameFlow& OBJ)
 {
 	Dmy.loadTex("DummyEnemy.png", OBJ);
 	DummyTime.Begin();
-	posX = 25;
-	posY = 500;
-	spdX = 0;
-	spdY = 0;
-	DmyHealth = 1000;
-	AtkHitbox.resize(1);
-	//Standing Sprite initialized
-	StandingSprite[0].x = 1;
-	StandingSprite[0].y = 1;
-	StandingSprite[0].w = 111;
-	StandingSprite[0].h = 131;
-	//Attack Sprite initialized
-	AttackSprite[0].x = 114;
-	AttackSprite[0].y = 1;
-	AttackSprite[0].h = 143;
-	AttackSprite[0].w = 103;
-	//Moving Sprite initialized
-	MovingSprite[0].x = 1;
-	MovingSprite[0].y = 146;
-	MovingSprite[0].h = 152;
-	MovingSprite[0].w = 101;
 }
 
-void Dummy::movement(const GameFlow& OBJ, int PlayerX, int PlayerY)
-{
-	if(DummyTime.getTicks() % 8000 == 0)
-		if (posX - PlayerX > 5)
-		{
-			left(OBJ);
-			attack(OBJ);
-		}
-		else if (posX - PlayerX < -5)
-		{
-			right(OBJ);
-			attack(OBJ);
-		}//Continue working on general AI. Give it an attack
-
-
-		
-}
-
-void Dummy::left(const GameFlow& OBJ)
-{
-	current = Moving;
-	spdX += 1; posX -= spdX; render(OBJ);
-}
-
-void Dummy::right(const GameFlow& OBJ)
-{
-	current = Moving;
-	spdX += 1; posX += spdX; render(OBJ);
-}
-
-std::vector<SDL_Rect> Dummy::attack(const GameFlow& OBJ)
-{
-	current = Attacking;
-	render(OBJ);
-	AtkHitbox[0].x = posX + 6;
-	AtkHitbox[0].y = posY;//Return something
-	return AtkHitbox;
-}
-
-void Dummy::reaction()
-{
-	spdX += 9; posX += spdX;
-	spdX = 0;
-	DmyHealth - 10;
-
-}
-
-void Dummy::render(const GameFlow& OBJ)
+const SDL_Rect& Dummy::currentSprite() const
 {
 	switch (current)
 	{
-	case Attacking:
-		SDL_RenderClear(OBJ.mainRender);
-		Dmy.render(OBJ, posX, posY, &AttackSprite[0]);
-		SDL_RenderPresent(OBJ.mainRender);
-		break;
-
-	case Moving:
-		SDL_RenderClear(OBJ.mainRender);
-		Dmy.render(OBJ, posX, posY, &MovingSprite[0]);
-		SDL_RenderPresent(OBJ.mainRender);
-		break;
-
-	case Standing:
-		SDL_RenderClear(OBJ.mainRender);
-		Dmy.render(OBJ, posX, posY, &MovingSprite[0]);
-		SDL_RenderPresent(OBJ.mainRender);
+	case Attacking: return AttackSprite;
+	case Moving: return MovingSprite;
+	default: return StandingSprite;
 	}
+}
+
+/********************************************//**
+ *  Dummy::update(int playerCentreX)
+ * The dummys AI. It walks towards the player until it is close, and every AttackInterval it stops to hold its attack pose.
+ * The attack does not hurt the player yet.
+ ***********************************************/
+void Dummy::update(int playerCentreX)
+{
+	if (!isAlive())
+	{
+		return;
+	}
+
+	if (current == Attacking)
+	{
+		if (DummyTime.getTicks() < AttackDuration)
+		{
+			return;
+		}
+		current = Standing;
+		DummyTime.Begin();
+	}
+
+	const int distance = playerCentreX - centreX();
+	facingRight = distance > 0;
+
+	if (DummyTime.getTicks() >= AttackInterval)
+	{
+		current = Attacking;
+		DummyTime.Begin();
+	}
+	else if (distance > StopDistance)
+	{
+		current = Moving;
+		posX += WalkSpeed;
+	}
+	else if (distance < -StopDistance)
+	{
+		current = Moving;
+		posX -= WalkSpeed;
+	}
+	else
+	{
+		current = Standing;
+	}
+}
+
+void Dummy::reaction(int direction)
+{
+	DmyHealth -= HitDamage;
+	posX += direction * Knockback;
+
+	//Keep the dummy on screen
+	if (posX < 0)
+	{
+		posX = 0;
+	}
+	else if (posX > GameFlow::ScreenW - currentSprite().w)
+	{
+		posX = GameFlow::ScreenW - currentSprite().w;
+	}
+
+	if (!isAlive())
+	{
+		Dmy.killTexture();
+	}
+}
+
+SDL_Rect Dummy::hurtbox() const
+{
+	const SDL_Rect& sprite = currentSprite();
+	const SDL_Rect box = { posX, GameFlow::GroundY - sprite.h, sprite.w, sprite.h };
+	return box;
+}
+
+/********************************************//**
+ *  Dummy::render(const GameFlow& OBJ)
+ * Draws the pose matching the current state. The sheet faces left, so it is flipped when facing right.
+ ***********************************************/
+void Dummy::render(const GameFlow& OBJ) const
+{
+	if (!isAlive())
+	{
+		return;
+	}
+	const SDL_Rect box = hurtbox();
+	Dmy.render(OBJ, box.x, box.y, &currentSprite(), 0.0, nullptr, facingRight ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
 }
